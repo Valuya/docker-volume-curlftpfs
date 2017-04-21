@@ -4,6 +4,6 @@ RUN apk update && apk add sshfs
 
 RUN mkdir -p /run/docker/plugins /mnt/state /mnt/volumes
 
-COPY docker-volume-sshfs docker-volume-sshfs
+COPY docker-volume-curlftpfs docker-volume-curlftpfs
 
-CMD ["docker-volume-sshfs"]
+CMD ["docker-volume-curlftpfs"]

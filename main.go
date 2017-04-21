@@ -10,39 +10,36 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/go-plugins-helpers/volume"
 )
 
-const socketAddress = "/run/docker/plugins/sshfs.sock"
+const socketAddress = "/run/docker/plugins/curlftpfs.sock"
 
-type sshfsVolume struct {
-	Password string
-	Sshcmd   string
-	Port     string
-
+type curlftpfsVolume struct {
+	Address     string
+	Credentials string
 	Mountpoint  string
 	connections int
 }
 
-type sshfsDriver struct {
+type curlftpfsDriver struct {
 	sync.RWMutex
 
 	root      string
 	statePath string
-	volumes   map[string]*sshfsVolume
+	volumes   map[string]*curlftpfsVolume
 }
 
-func newSshfsDriver(root string) (*sshfsDriver, error) {
+func newCurftpfsDriver(root string) (*curlftpfsDriver, error) {
 	logrus.WithField("method", "new driver").Debug(root)
 
-	d := &sshfsDriver{
+	d := &curlftpfsDriver{
 		root:      filepath.Join(root, "volumes"),
-		statePath: filepath.Join(root, "state", "sshfs-state.json"),
-		volumes:   map[string]*sshfsVolume{},
+		statePath: filepath.Join(root, "state", "curlftpfs-state.json"),
+		volumes:   map[string]*curlftpfsVolume{},
 	}
 
 	data, err := ioutil.ReadFile(d.statePath)
@@ -61,7 +58,7 @@ func newSshfsDriver(root string) (*sshfsDriver, error) {
 	return d, nil
 }
 
-func (d *sshfsDriver) saveState() {
+func (d *curlftpfsDriver) saveState() {
 	data, err := json.Marshal(d.volumes)
 	if err != nil {
 		logrus.WithField("statePath", d.statePath).Error(err)
@@ -73,30 +70,28 @@ func (d *sshfsDriver) saveState() {
 	}
 }
 
-func (d *sshfsDriver) Create(r volume.Request) volume.Response {
+func (d *curlftpfsDriver) Create(r volume.Request) volume.Response {
 	logrus.WithField("method", "create").Debugf("%#v", r)
 
 	d.Lock()
 	defer d.Unlock()
-	v := &sshfsVolume{}
+	v := &curlftpfsVolume{}
 
 	for key, val := range r.Options {
 		switch key {
-		case "sshcmd":
-			v.Sshcmd = val
-		case "password":
-			v.Password = val
-		case "port":
-			v.Port = val
+		case "address":
+			v.Address = val
+		case "credentials":
+			v.Credentials = val
 		default:
 			return responseError(fmt.Sprintf("unknown option %q", val))
 		}
 	}
 
-	if v.Sshcmd == "" {
-		return responseError("'sshcmd' option required")
+	if v.Address == "" {
+		return responseError("'address' option required")
 	}
-	v.Mountpoint = filepath.Join(d.root, fmt.Sprintf("%x", md5.Sum([]byte(v.Sshcmd))))
+	v.Mountpoint = filepath.Join(d.root, fmt.Sprintf("%x", md5.Sum([]byte(v.Address + v.Credentials))))
 
 	d.volumes[r.Name] = v
 
@@ -105,7 +100,7 @@ func (d *sshfsDriver) Create(r volume.Request) volume.Response {
 	return volume.Response{}
 }
 
-func (d *sshfsDriver) Remove(r volume.Request) volume.Response {
+func (d *curlftpfsDriver) Remove(r volume.Request) volume.Response {
 	logrus.WithField("method", "remove").Debugf("%#v", r)
 
 	d.Lock()
@@ -127,7 +122,7 @@ func (d *sshfsDriver) Remove(r volume.Request) volume.Response {
 	return volume.Response{}
 }
 
-func (d *sshfsDriver) Path(r volume.Request) volume.Response {
+func (d *curlftpfsDriver) Path(r volume.Request) volume.Response {
 	logrus.WithField("method", "path").Debugf("%#v", r)
 
 	d.RLock()
@@ -141,7 +136,7 @@ func (d *sshfsDriver) Path(r volume.Request) volume.Response {
 	return volume.Response{Mountpoint: v.Mountpoint}
 }
 
-func (d *sshfsDriver) Mount(r volume.MountRequest) volume.Response {
+func (d *curlftpfsDriver) Mount(r volume.MountRequest) volume.Response {
 	logrus.WithField("method", "mount").Debugf("%#v", r)
 
 	d.Lock()
@@ -176,7 +171,7 @@ func (d *sshfsDriver) Mount(r volume.MountRequest) volume.Response {
 	return volume.Response{Mountpoint: v.Mountpoint}
 }
 
-func (d *sshfsDriver) Unmount(r volume.UnmountRequest) volume.Response {
+func (d *curlftpfsDriver) Unmount(r volume.UnmountRequest) volume.Response {
 	logrus.WithField("method", "unmount").Debugf("%#v", r)
 
 	d.Lock()
@@ -198,7 +193,7 @@ func (d *sshfsDriver) Unmount(r volume.UnmountRequest) volume.Response {
 	return volume.Response{}
 }
 
-func (d *sshfsDriver) Get(r volume.Request) volume.Response {
+func (d *curlftpfsDriver) Get(r volume.Request) volume.Response {
 	logrus.WithField("method", "get").Debugf("%#v", r)
 
 	d.Lock()
@@ -212,7 +207,7 @@ func (d *sshfsDriver) Get(r volume.Request) volume.Response {
 	return volume.Response{Volume: &volume.Volume{Name: r.Name, Mountpoint: v.Mountpoint}}
 }
 
-func (d *sshfsDriver) List(r volume.Request) volume.Response {
+func (d *curlftpfsDriver) List(r volume.Request) volume.Response {
 	logrus.WithField("method", "list").Debugf("%#v", r)
 
 	d.Lock()
@@ -225,26 +220,24 @@ func (d *sshfsDriver) List(r volume.Request) volume.Response {
 	return volume.Response{Volumes: vols}
 }
 
-func (d *sshfsDriver) Capabilities(r volume.Request) volume.Response {
+func (d *curlftpfsDriver) Capabilities(r volume.Request) volume.Response {
 	logrus.WithField("method", "capabilities").Debugf("%#v", r)
 
 	return volume.Response{Capabilities: volume.Capability{Scope: "local"}}
 }
 
-func (d *sshfsDriver) mountVolume(v *sshfsVolume) error {
-	cmd := exec.Command("sshfs", "-oStrictHostKeyChecking=no", v.Sshcmd, v.Mountpoint)
-	if v.Port != "" {
-		cmd.Args = append(cmd.Args, "-p", v.Port)
+func (d *curlftpfsDriver) mountVolume(v *curlftpfsVolume) error {
+	cmd := exec.Command("curftpfs")
+	cmd.Args = append(cmd.Args, "-o", "allow_other")
+	if v.Credentials != "" {
+		cmd.Args = append(cmd.Args, "-o", "user=" + v.Credentials)
 	}
-	if v.Password != "" {
-		cmd.Args = append(cmd.Args, "-p", v.Port, "-o", "workaround=rename", "-o", "password_stdin")
-		cmd.Stdin = strings.NewReader(v.Password)
-	}
+	cmd.Args = append(cmd.Args, v.Address, v.Mountpoint)
 	logrus.Debug(cmd.Args)
 	return cmd.Run()
 }
 
-func (d *sshfsDriver) unmountVolume(target string) error {
+func (d *curlftpfsDriver) unmountVolume(target string) error {
 	cmd := fmt.Sprintf("umount %s", target)
 	logrus.Debug(cmd)
 	return exec.Command("sh", "-c", cmd).Run()
@@ -261,7 +254,7 @@ func main() {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
-	d, err := newSshfsDriver("/mnt")
+	d, err := newCurftpfsDriver("/mnt")
 	if err != nil {
 		log.Fatal(err)
 	}

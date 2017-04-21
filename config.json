@@ -1,8 +1,8 @@
 {
-    "description": "sshFS plugin for Docker",
+    "description": "curlftpfs plugin for Docker",
     "documentation": "https://docs.docker.com/engine/extend/plugins/",
     "entrypoint": [
-        "/docker-volume-sshfs"
+        "/docker-volume-curlftpfs"
     ],
     "env": [
         {
@@ -14,7 +14,7 @@
         }
     ],
     "interface": {
-        "socket": "sshfs.sock",
+        "socket": "curlftpfs.sock",
         "types": [
             "docker.volumedriver/1.0"
         ]
