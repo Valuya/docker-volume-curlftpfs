@@ -3,7 +3,7 @@
 pipeline {
     agent any
     parameters {
-        string(name:'PLUGIN_NAME', defaultValue:'valuya.be:50443/valuya/curlftpfs', description: '')
+        string(name:'PLUGIN_NAME', defaultValue:'valuya.be:5000/valuya/curlftpfs', description: '')
         string(name:'PLUGIN_TAG', defaultValue:'dev', description: '')
     }
     options {
