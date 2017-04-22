@@ -1,4 +1,4 @@
-# Docker volume plugin for curlftpds
+# Docker volume plugin for curlftpfs
 
 This plugin allows you to mount remote folder using curlftpfs in your container easily.
 Adapted from vieux/sshfs
