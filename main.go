@@ -19,10 +19,11 @@ import (
 const socketAddress = "/run/docker/plugins/curlftpfs.sock"
 
 type curlftpfsVolume struct {
-	Address     string
-	Credentials string
-	Mountpoint  string
-	connections int
+	Address          string
+	Credentials      string
+	HostMountpoint   string
+	PluginMountpoint string
+	connections      int
 }
 
 type curlftpfsDriver struct {
@@ -33,7 +34,7 @@ type curlftpfsDriver struct {
 	volumes   map[string]*curlftpfsVolume
 }
 
-func newCurftpfsDriver(root string) (*curlftpfsDriver, error) {
+func newCurlftpfsDriver(root string) (*curlftpfsDriver, error) {
 	logrus.WithField("method", "new driver").Debug(root)
 
 	d := &curlftpfsDriver{
@@ -91,7 +92,10 @@ func (d *curlftpfsDriver) Create(r volume.Request) volume.Response {
 	if v.Address == "" {
 		return responseError("'address' option required")
 	}
-	v.Mountpoint = filepath.Join(d.root, fmt.Sprintf("%x", md5.Sum([]byte(v.Address + v.Credentials))))
+
+	hash:= md5.Sum([]byte(v.Address + v.Credentials))
+	v.HostMountpoint = filepath.Join(d.root, fmt.Sprintf("%x", hash))
+	v.PluginMountpoint = filepath.Join("/mnt/volumes/", fmt.Sprintf("%x", hash))
 
 	d.volumes[r.Name] = v
 
@@ -114,7 +118,7 @@ func (d *curlftpfsDriver) Remove(r volume.Request) volume.Response {
 	if v.connections != 0 {
 		return responseError(fmt.Sprintf("volume %s is currently used by a container", r.Name))
 	}
-	if err := os.RemoveAll(v.Mountpoint); err != nil {
+	if err := os.RemoveAll(v.HostMountpoint); err != nil {
 		return responseError(err.Error())
 	}
 	delete(d.volumes, r.Name)
@@ -133,7 +137,7 @@ func (d *curlftpfsDriver) Path(r volume.Request) volume.Response {
 		return responseError(fmt.Sprintf("volume %s not found", r.Name))
 	}
 
-	return volume.Response{Mountpoint: v.Mountpoint}
+	return volume.Response{Mountpoint: v.PluginMountpoint}
 }
 
 func (d *curlftpfsDriver) Mount(r volume.MountRequest) volume.Response {
@@ -148,9 +152,9 @@ func (d *curlftpfsDriver) Mount(r volume.MountRequest) volume.Response {
 	}
 
 	if v.connections == 0 {
-		fi, err := os.Lstat(v.Mountpoint)
+		fi, err := os.Lstat(v.HostMountpoint)
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll(v.Mountpoint, 0755); err != nil {
+			if err := os.MkdirAll(v.HostMountpoint, 0755); err != nil {
 				return responseError(err.Error())
 			}
 		} else if err != nil {
@@ -158,7 +162,7 @@ func (d *curlftpfsDriver) Mount(r volume.MountRequest) volume.Response {
 		}
 
 		if fi != nil && !fi.IsDir() {
-			return responseError(fmt.Sprintf("%v already exist and it's not a directory", v.Mountpoint))
+			return responseError(fmt.Sprintf("%v already exist and it's not a directory", v.HostMountpoint))
 		}
 
 		if err := d.mountVolume(v); err != nil {
@@ -168,7 +172,7 @@ func (d *curlftpfsDriver) Mount(r volume.MountRequest) volume.Response {
 
 	v.connections++
 
-	return volume.Response{Mountpoint: v.Mountpoint}
+	return volume.Response{Mountpoint: v.PluginMountpoint}
 }
 
 func (d *curlftpfsDriver) Unmount(r volume.UnmountRequest) volume.Response {
@@ -184,7 +188,7 @@ func (d *curlftpfsDriver) Unmount(r volume.UnmountRequest) volume.Response {
 	v.connections--
 
 	if v.connections <= 0 {
-		if err := d.unmountVolume(v.Mountpoint); err != nil {
+		if err := d.unmountVolume(v.HostMountpoint); err != nil {
 			return responseError(err.Error())
 		}
 		v.connections = 0
@@ -204,7 +208,7 @@ func (d *curlftpfsDriver) Get(r volume.Request) volume.Response {
 		return responseError(fmt.Sprintf("volume %s not found", r.Name))
 	}
 
-	return volume.Response{Volume: &volume.Volume{Name: r.Name, Mountpoint: v.Mountpoint}}
+	return volume.Response{Volume: &volume.Volume{Name: r.Name, Mountpoint: v.PluginMountpoint}}
 }
 
 func (d *curlftpfsDriver) List(r volume.Request) volume.Response {
@@ -215,7 +219,7 @@ func (d *curlftpfsDriver) List(r volume.Request) volume.Response {
 
 	var vols []*volume.Volume
 	for name, v := range d.volumes {
-		vols = append(vols, &volume.Volume{Name: name, Mountpoint: v.Mountpoint})
+		vols = append(vols, &volume.Volume{Name: name, Mountpoint: v.PluginMountpoint})
 	}
 	return volume.Response{Volumes: vols}
 }
@@ -227,12 +231,12 @@ func (d *curlftpfsDriver) Capabilities(r volume.Request) volume.Response {
 }
 
 func (d *curlftpfsDriver) mountVolume(v *curlftpfsVolume) error {
-	cmd := exec.Command("curftpfs")
-	cmd.Args = append(cmd.Args, "-o", "allow_other")
+	cmd := exec.Command("curlftpfs")
+	cmd.Args = append(cmd.Args, "-o", "allow_other,uid=1000,gid=1000,umask=0022")
 	if v.Credentials != "" {
 		cmd.Args = append(cmd.Args, "-o", "user=" + v.Credentials)
 	}
-	cmd.Args = append(cmd.Args, v.Address, v.Mountpoint)
+	cmd.Args = append(cmd.Args, v.Address, v.HostMountpoint)
 	logrus.Debug(cmd.Args)
 	return cmd.Run()
 }
@@ -254,11 +258,12 @@ func main() {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
-	d, err := newCurftpfsDriver("/mnt")
+	d, err := newCurlftpfsDriver("/mnt")
 	if err != nil {
 		log.Fatal(err)
 	}
 	h := volume.NewHandler(d)
+
 	logrus.Infof("listening on %s", socketAddress)
 	logrus.Error(h.ServeUnix(socketAddress, 0))
 }
