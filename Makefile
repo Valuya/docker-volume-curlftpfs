@@ -1,5 +1,3 @@
-PLUGIN_NAME=valuya/curlftpfs
-PLUGIN_TAG=next
 
 all: clean docker rootfs create
 
