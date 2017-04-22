@@ -1,20 +1,21 @@
-# Docker volume plugin for sshFS
+# Docker volume plugin for curlftpds
 
 This plugin allows you to mount remote folder using curlftpfs in your container easily.
+Adapted from vieux/sshfs
 
 ## Usage
 
 1 - Install the plugin
 
 ```
-$ docker plugin install valuya/curlftpfs # or docker plugin install vieux/sshfs DEBUG=1
+$ docker plugin install valuya/curlftpfs # or docker plugin install valuya/curlftpfs DEBUG=1
 ```
 
 2 - Create a volume
 
 ```
 $ docker volume create -d valuya/curlftpfs -o address=<ip:port> -o credentials=<user:password> ftpvolume
-sshvolume
+ftpvolume
 $ docker volume ls
 DRIVER              VOLUME NAME
 local               2d75de358a70ba469ac968ee852efd4234b9118b7722ee26a1c5a90dcaea6751
@@ -28,7 +29,7 @@ valuya/curlftpfs    ftpvolume
 3 - Use the volume
 
 ```
-$ docker run -it -v sshvolume:<path>:nocopy busybox ls <path>
+$ docker run -it -v ftpvolume:<path>:nocopy busybox ls <path>
 ```
 Make sure to add the nocopy option to your mount description.
 
