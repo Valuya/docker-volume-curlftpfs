@@ -3,8 +3,8 @@
 pipeline {
     agent any
     parameters {
-        string(name:'PLUGIN_NAME', defaultValue:'valuya.be:5000/valuya/curlftpfs', description: '')
-        string(name:'PLUGIN_TAG', defaultValue:'dev', description: '')
+        string(name:'PLUGIN_NAME', defaultValue: 'valuya/curlftpfs', description: '')
+        string(name:'PLUGIN_TAG', defaultValue:'next', description: '')
     }
     options {
         disableConcurrentBuilds()
