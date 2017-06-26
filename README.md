@@ -8,13 +8,13 @@ Adapted from vieux/sshfs
 1 - Install the plugin
 
 ```
-$ docker plugin install valuya/curlftpfs # or docker plugin install valuya/curlftpfs DEBUG=1
+$ docker plugin install valuya/curlftpfs:next # or docker plugin install valuya/curlftpfs:next DEBUG=1
 ```
 
 2 - Create a volume
 
 ```
-$ docker volume create -d valuya/curlftpfs -o address=<ip:port> -o credentials=<user:password> ftpvolume
+$ docker volume create -d valuya/curlftpfs:next -o address=<ip:port> -o credentials=<user:password> ftpvolume
 ftpvolume
 $ docker volume ls
 DRIVER              VOLUME NAME
