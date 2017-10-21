@@ -22,7 +22,7 @@ pipeline {
         }
         stage ('Publish') {
             steps {
-               sh 'sudo -E make create push'
+               sh 'sudo -E make create push clean'
             }
         }
     }
