@@ -21,6 +21,9 @@ const socketAddress = "/run/docker/plugins/curlftpfs.sock"
 type curlftpfsVolume struct {
 	Address          string
 	Credentials      string
+	Uid			     string
+	Gid			     string
+	Umask			 string
 	HostMountpoint   string
 	PluginMountpoint string
 	connections      int
@@ -76,7 +79,11 @@ func (d *curlftpfsDriver) Create(r volume.Request) volume.Response {
 
 	d.Lock()
 	defer d.Unlock()
-	v := &curlftpfsVolume{}
+	v := &curlftpfsVolume{
+		Uid: "1000",
+		Gid: "1000",
+		Umask: "0022",
+	}
 
 	for key, val := range r.Options {
 		switch key {
@@ -84,6 +91,12 @@ func (d *curlftpfsDriver) Create(r volume.Request) volume.Response {
 			v.Address = val
 		case "credentials":
 			v.Credentials = val
+		case "uid":
+			v.Uid= val
+		case "gid":
+			v.Gid= val
+		case "umask":
+			v.Umask= val
 		default:
 			return responseError(fmt.Sprintf("unknown option %q", val))
 		}
@@ -232,9 +245,18 @@ func (d *curlftpfsDriver) Capabilities(r volume.Request) volume.Response {
 
 func (d *curlftpfsDriver) mountVolume(v *curlftpfsVolume) error {
 	cmd := exec.Command("curlftpfs")
-	cmd.Args = append(cmd.Args, "-o", "allow_other,uid=1000,gid=1000,umask=0022")
+	cmd.Args = append(cmd.Args, "-o", "allow_other")
 	if v.Credentials != "" {
 		cmd.Args = append(cmd.Args, "-o", "user=" + v.Credentials)
+	}
+	if v.Uid != "" {
+		cmd.Args = append(cmd.Args, "-o", "uid=" + v.Uid)
+	}
+	if v.Gid != "" {
+		cmd.Args = append(cmd.Args, "-o", "gid=" + v.Gid)
+	}
+	if v.Umask!= "" {
+		cmd.Args = append(cmd.Args, "-o", "umask=" + v.Umask)
 	}
 	cmd.Args = append(cmd.Args, v.Address, v.HostMountpoint)
 	logrus.Debug(cmd.Args)
