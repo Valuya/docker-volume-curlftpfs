@@ -33,6 +33,13 @@ $ docker run -it -v ftpvolume:<path>:nocopy busybox ls <path>
 ```
 Make sure to add the nocopy option to your mount description.
 
+### Supported options
+- address (ip:port)
+- credentials (user:password)
+- uid (1000)
+- gid (1000)
+- umask (0022)
+
 ## THANKS
 
 https://github.com/docker/go-plugins-helpers
