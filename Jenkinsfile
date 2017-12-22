@@ -16,7 +16,12 @@ pipeline {
         stage ('Build') {
             steps {
               sh '''
-                rm -rf rootfs
+                sudo rm -rf rootfs
+                sudo docker rm curlftpfsbuild || echo "."
+                sudo docker rmi curlftpfsbuild || echo "."
+                sudo docker rm pluginbuild || echo "."
+                sudo docker rmi "${PLUGIN_NAME}":rootfs || echo "."
+
                 sudo docker build -q -t curlftpfsbuild -f Dockerfile.dev .
                 sudo docker create --name curlftpfsbuild curlftpfsbuild
                 sudo docker cp curlftpfsbuild:/go/bin/docker-volume-curlftpfs .
@@ -27,16 +32,17 @@ pipeline {
 
                 mkdir -p rootfs
                 sudo docker create --name pluginbuild "${PLUGIN_NAME}":rootfs
-                sudo docker export pluginbuild | tar -x -C rootfs/rootfs
+                sudo docker export pluginbuild | tar -x -C rootfs
                 sudo cp config.json rootfs/
                 sudo docker stop pluginbuild
                 sudo docker rm pluginbuild
 
-                sudo docker plugin rm "${PLUGIN_NAME}":"${PLUGIN_TAG}"
-                sudo docker plugin create "${PLUGIN_NAME}":"${PLUGIN_TAG}" rootfs
+                sudo docker plugin rm "${PLUGIN_NAME}":"${PLUGIN_TAG}" || echo "."
+                sudo docker plugin create "${PLUGIN_NAME}":"${PLUGIN_TAG}" .
 
                 sudo rm -rf rootfs
                 sudo rm -rf docker-volume-curlftpfs
+                sudo docker rmi "${PLUGIN_NAME}":rootfs
               '''
             }
         }
